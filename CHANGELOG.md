@@ -13,6 +13,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Linux/macOS/Windows (amd64 + arm64) on each `v*` tag and attaches the archives
   plus a sha256 checksums file to a GitHub Release.
 
+### Fixed
+
+- **Reject host aliases containing whitespace instead of silently corrupting the
+  config.** A `Host` line is whitespace-separated patterns, and the parser does
+  not honour quoting for them, so saving an alias like `my server` wrote
+  `Host my server` — which ssh (and the next `Load`) reads as two patterns,
+  fanning the entry out into several **read-only** rows. The form now rejects a
+  spaced alias up front ("alias can't contain spaces…"), and the writer guards
+  the same case for any caller. (Leading/trailing space is still trimmed, as
+  before; only internal whitespace is rejected.)
+
 ## [0.4.2] — 2026-06-05
 
 ### Fixed

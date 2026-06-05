@@ -69,6 +69,9 @@ func TestValidate(t *testing.T) {
 		{"both whitespace", map[string]string{"alias": "  ", "host": " "}, true},
 		{"alias only", map[string]string{"alias": "web"}, false},
 		{"host only", map[string]string{"host": "10.0.0.7"}, false},
+		{"space in alias", map[string]string{"alias": "my server"}, true},
+		{"space in fallback host-as-alias", map[string]string{"host": "my host"}, true},
+		{"space in host but explicit alias ok", map[string]string{"alias": "web", "host": "10.0.0.7"}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

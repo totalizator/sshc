@@ -115,8 +115,19 @@ func (f *formModel) backspace() {
 // alias is derived from HostName when blank, so a host needs at least one of
 // the two; everything else has a sensible default.
 func (f formModel) validate() string {
-	if strings.TrimSpace(f.values["alias"]) == "" && strings.TrimSpace(f.values["host"]) == "" {
+	alias := strings.TrimSpace(f.values["alias"])
+	host := strings.TrimSpace(f.values["host"])
+	if alias == "" && host == "" {
 		return "enter an alias or a hostname"
+	}
+	// The alias becomes the `Host` pattern; it falls back to the hostname when
+	// blank (see toHost). ssh splits a Host line on whitespace, so a space would
+	// fan the entry out into several read-only hosts — reject it here.
+	if alias == "" {
+		alias = host
+	}
+	if strings.ContainsAny(alias, " \t") {
+		return "alias can't contain spaces (ssh reads each word as a separate host)"
 	}
 	return ""
 }

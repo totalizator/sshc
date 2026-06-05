@@ -44,7 +44,11 @@ func Update(path, oldAlias string, h Host) error {
 		}
 		block := cfg.Hosts[idx]
 		if h.Alias != oldAlias {
-			pat, err := ssh_config.NewPattern(strings.TrimSpace(h.Alias))
+			alias := strings.TrimSpace(h.Alias)
+			if err := validateAlias(alias); err != nil {
+				return nil, err
+			}
+			pat, err := ssh_config.NewPattern(alias)
 			if err != nil {
 				return nil, fmt.Errorf("invalid host name %q: %w", h.Alias, err)
 			}
@@ -197,10 +201,29 @@ func mutate(path string, fn func(*ssh_config.Config) ([]*ssh_config.Host, error)
 	return os.WriteFile(path, []byte(out), 0o600)
 }
 
+// validateAlias rejects aliases the SSH config grammar can't represent as a
+// single host. Whitespace is the critical case: `Host my server` is two
+// patterns to ssh — and to the parser on the next Load, which would silently
+// fan the block out into multiple read-only entries. The underlying library
+// does not honour double-quoting for Host patterns either, so a space cannot be
+// carried at all; reject it rather than write a block that corrupts on reload.
+func validateAlias(alias string) error {
+	if alias == "" {
+		return fmt.Errorf("host alias is empty")
+	}
+	if strings.ContainsAny(alias, " \t") {
+		return fmt.Errorf("host alias %q contains whitespace; ssh reads each word as a separate host pattern", alias)
+	}
+	return nil
+}
+
 // buildBlock constructs a fresh Host AST node from h. Only non-empty fields are
 // emitted as directives.
 func buildBlock(h Host) (*ssh_config.Host, error) {
 	alias := strings.TrimSpace(h.Alias)
+	if err := validateAlias(alias); err != nil {
+		return nil, err
+	}
 	pat, err := ssh_config.NewPattern(alias)
 	if err != nil {
 		return nil, fmt.Errorf("invalid host name %q: %w", alias, err)
