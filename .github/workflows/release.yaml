@@ -1,0 +1,64 @@
+name: release
+
+# Build cross-platform binaries and attach them to a GitHub release whenever a
+# version tag is pushed.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # required for the action to create the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so `git describe` and tags resolve
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Build cross-platform binaries
+        run: |
+          set -euo pipefail
+          command -v zip >/dev/null || { sudo apt-get update && sudo apt-get install -y zip; }
+
+          VERSION="${GITHUB_REF_NAME}"
+          LDFLAGS="-s -w -X github.com/totalizator/sshc/cmd.version=${VERSION}"
+          mkdir -p dist build
+
+          for p in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            export GOOS="${p%/*}" GOARCH="${p#*/}" CGO_ENABLED=0
+            ext=""; [ "$GOOS" = "windows" ] && ext=".exe"
+            # Build linux as PIE (ET_DYN): enables ASLR and is the modern-distro
+            # default. (Necessary but not sufficient for Android/Termux, which also
+            # trips on TLS alignment + argv — build from source there; see README.)
+            # macOS is PIE by default; leave Windows as-is.
+            buildmode=""; [ "$GOOS" = "linux" ] && buildmode="-buildmode=pie"
+            echo "==> building ${GOOS}/${GOARCH}"
+            go build $buildmode -trimpath -ldflags "$LDFLAGS" -o "build/sshc${ext}" .
+
+            base="sshc_${VERSION}_${GOOS}_${GOARCH}"
+            if [ "$GOOS" = "windows" ]; then
+              (cd build && zip -q "../dist/${base}.zip" "sshc${ext}")
+            else
+              tar -C build -czf "dist/${base}.tar.gz" "sshc${ext}"
+            fi
+            rm -f "build/sshc${ext}"
+          done
+
+          (cd dist && sha256sum * > "sshc_${VERSION}_checksums.txt")
+          ls -l dist
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          # secrets.GITHUB_TOKEN is provided automatically; the contents:write
+          # permission above lets it create the release and upload assets.

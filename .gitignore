@@ -1,0 +1,27 @@
+# Compiled binaries
+/sshc
+/sshc.exe
+*.exe
+
+# Release build artifacts (produced locally or in CI)
+/dist/
+/build/
+
+# SSH config backups produced by sshc
+*.sshc.bak
+
+# Test / coverage artifacts
+*.out
+coverage.*
+
+# Intermediate artifacts from `make shots` + rasterize.ps1 (the committed PNGs are
+# the output; SVGs are sanitized by GitHub so they are not shipped)
+/demo/_ansi/
+/demo/*.svg
+
+# Scratch / working notes
+/tmp/
+
+# Editor / OS cruft
+.DS_Store
+*.swp
