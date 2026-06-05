@@ -13,6 +13,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Linux/macOS/Windows (amd64 + arm64) on each `v*` tag and attaches the archives
   plus a sha256 checksums file to a GitHub Release.
 
+## [0.4.2] — 2026-06-05
+
 ### Fixed
 
 - **`looksLikeSSH` now recognises the ssh client regardless of path separator.**

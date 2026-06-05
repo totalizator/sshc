@@ -60,5 +60,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          generate_release_notes: true
           # secrets.GITHUB_TOKEN is provided automatically; the contents:write
           # permission above lets it create the release and upload assets.
