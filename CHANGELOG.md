@@ -13,6 +13,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Linux/macOS/Windows (amd64 + arm64) on each `v*` tag and attaches the archives
   plus a sha256 checksums file to a GitHub Release.
 
+### Fixed
+
+- **`looksLikeSSH` now recognises the ssh client regardless of path separator.**
+  It used `filepath.Base`, which only splits on the host OS's separator, so a
+  Windows-style `…\ssh.exe` path was not parsed on non-Windows platforms (the
+  `TestLooksLikeSSH` case failed under Linux CI). It now splits on both `/` and
+  `\` everywhere.
+
 ### Documentation
 
 - **Regenerated the README screenshots without the row gap.** Two causes: the

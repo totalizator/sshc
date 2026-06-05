@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -717,7 +716,14 @@ func connectArgs(h ssh.Host, tmpl, sessionUser string) ([]string, error) {
 // can be safely injected with -l. Guards against breaking exotic custom
 // templates (e.g. mosh) that don't take ssh's flags.
 func looksLikeSSH(cmd string) bool {
-	base := strings.ToLower(filepath.Base(cmd))
+	// Take the basename, honoring both / and \ separators on every platform
+	// (filepath.Base only splits on the host OS's separator, so a Windows-style
+	// path would not be parsed on Linux CI).
+	base := cmd
+	if i := strings.LastIndexAny(base, `/\`); i >= 0 {
+		base = base[i+1:]
+	}
+	base = strings.ToLower(base)
 	base = strings.TrimSuffix(base, ".exe")
 	return base == "ssh"
 }
