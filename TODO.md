@@ -46,6 +46,27 @@ only the comment so the block body is preserved byte-for-byte.
   - optional grouping of the list by tag;
   - tag autocomplete from tags already in use.
 
+- **Return to sshc after an ssh session.** **TODO.** Today `tui.Run` quits the
+  Bubble Tea program on connect and then runs ssh (`connect` in
+  `tui/model.go`), so when the session ends the process exits to the shell.
+  Instead:
+  - **Clean exit** (ssh exits 0) → go straight back to the sshc host list
+    (selection kept on the host just used); quitting sshc is then a normal
+    `q`/`Esc` from the list.
+  - **Connection drop or other error** (non-zero exit, notably ssh's `255`
+    for connection/auth failures, or a failure to start the command) → don't
+    jump back immediately: leave ssh's error output on screen, print a short
+    sshc status line with a **timestamp** (e.g.
+    `[2026-10-21 14:03:12] connection to prod-web-01 lost (exit 255) — press Enter to return to sshc`),
+    and wait for a keypress before re-entering the TUI.
+  - Implementation sketch: loop in `Run` (re-create the model, reload hosts so
+    the `used=` stamp shows) or use `tea.ExecProcess` to suspend/resume the
+    program around the ssh child.
+  - Open question: ssh also propagates the *remote* command's exit status, so a
+    non-zero code isn't always a connection error (e.g. the last command run in
+    the session failed). Treat only `255` as an error, or any non-zero?
+    Decide before implementing.
+
 ## Nice-to-have (deferred)
 
 - **Shrink release binaries with `-s -w`.** ✅ **Done** (release CI). The release
