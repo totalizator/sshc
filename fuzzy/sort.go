@@ -1,6 +1,7 @@
-// Package fuzzy holds list-ordering helpers for the host list. Interactive
-// fuzzy matching lives in the TUI (see tui.scoreHost); what remains here is the
-// alphabetical ordering that backs the --sort-name flag.
+// Package fuzzy holds the host search and ordering logic shared by every sshc
+// front end: subsequence matching and ranking (match.go) and the alphabetical
+// ordering that backs the --sort-name flag (sort.go). It has no UI
+// dependencies; rendering of matches (e.g. highlighting) lives in the caller.
 package fuzzy
 
 import (

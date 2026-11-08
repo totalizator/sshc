@@ -13,6 +13,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Linux/macOS/Windows (amd64 + arm64) on each `v*` tag and attaches the archives
   plus a sha256 checksums file to a GitHub Release.
 
+### Changed
+
+- **Host search moved to the `fuzzy` package.** The subsequence matcher and
+  ranking (`fuzzy.Subseq`, `fuzzy.Score`) now live outside the TUI so other
+  front ends can reuse them and rank results identically. Pure refactor: the
+  logic is unchanged and the TUI's search and highlighting behave exactly as
+  before.
+
 ### Fixed
 
 - **Reject host aliases containing whitespace instead of silently corrupting the

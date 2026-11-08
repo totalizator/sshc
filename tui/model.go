@@ -439,7 +439,7 @@ func (m Model) searchHosts(q string) []ssh.Host {
 	}
 	var matched []scored
 	for _, h := range m.hosts {
-		if s, ok := scoreHost(q, h); ok {
+		if s, ok := fz.Score(q, h); ok {
 			matched = append(matched, scored{h, s})
 		}
 	}
