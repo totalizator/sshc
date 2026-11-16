@@ -48,6 +48,23 @@ func TestConnectArgs(t *testing.T) {
 			want:        []string{"mosh", "web"},
 		},
 		{
+			name: "startup runs on a TTY after the host",
+			host: ssh.Host{Alias: "web", Start: ssh.Startup{Kind: ssh.StartCmd, Cmd: "htop -d 5"}},
+			want: []string{"ssh", "-t", "web", "htop -d 5"},
+		},
+		{
+			name:        "startup with prompted user",
+			host:        ssh.Host{Alias: "web", Start: ssh.Startup{Kind: ssh.StartCmd, Cmd: "htop"}},
+			sessionUser: "deploy",
+			want:        []string{"ssh", "-t", "-l", "deploy", "web", "htop"},
+		},
+		{
+			name: "startup is not passed to a non-ssh template",
+			host: ssh.Host{Alias: "web", Start: ssh.Startup{Kind: ssh.StartCmd, Cmd: "htop"}},
+			tmpl: `mosh {{{name}}}`,
+			want: []string{"mosh", "web"},
+		},
+		{
 			name: "saved user, no prompt, default template (relies on config)",
 			host: ssh.Host{Alias: "web", HostName: "10.0.0.7", User: "root"},
 			want: []string{"ssh", "web"},

@@ -17,14 +17,37 @@ import (
 // fav/tags/env/last-used travel with the host when the config is shared.
 const metaPrefix = "sshc"
 
+// meta is the sshc metadata carried on a Host line.
+type meta struct {
+	tags     []string
+	env      string
+	fav      bool
+	lastUsed time.Time
+	start    Startup
+	// extra holds key=value tokens this version doesn't know (written by a
+	// newer sshc), kept verbatim so rewriting the line doesn't drop them.
+	extra []string
+}
+
+// recognised reports whether m has at least one key this version knows.
+func (m meta) recognised() bool {
+	return len(m.tags) > 0 || m.env != "" || m.fav || !m.lastUsed.IsZero() || !m.start.IsZero()
+}
+
+// metaOf takes h's metadata, keeping the unknown tokens of prev.
+func metaOf(h Host, prev meta) meta {
+	return meta{tags: h.Tags, env: h.Env, fav: h.Fav, lastUsed: h.LastUsed, start: h.Start, extra: prev.extra}
+}
+
 // parseMeta reads the sshc metadata carried in a Host line's EOL comment. The
 // comment string is the text after '#' (as exposed by the parser); a comment
 // that does not start with the sshc marker yields a zero meta and leaves the
 // host's regular fields untouched.
-func parseMeta(comment string) (tags []string, env string, fav bool, lastUsed time.Time) {
+func parseMeta(comment string) meta {
+	var m meta
 	fields := strings.Fields(strings.TrimSpace(comment))
 	if len(fields) == 0 || fields[0] != metaPrefix {
-		return nil, "", false, time.Time{}
+		return m
 	}
 	for _, tok := range fields[1:] {
 		key, val, ok := strings.Cut(tok, "=")
@@ -35,44 +58,90 @@ func parseMeta(comment string) (tags []string, env string, fav bool, lastUsed ti
 		case "tags":
 			for _, t := range strings.Split(val, ",") {
 				if t = sanitizeToken(t); t != "" {
-					tags = append(tags, t)
+					m.tags = append(m.tags, t)
 				}
 			}
 		case "env":
-			env = sanitizeToken(val)
+			m.env = sanitizeToken(val)
 		case "fav":
-			fav = val == "1" || strings.EqualFold(val, "true")
+			m.fav = val == "1" || strings.EqualFold(val, "true")
 		case "used":
 			if secs, err := strconv.ParseInt(val, 10, 64); err == nil && secs > 0 {
-				lastUsed = time.Unix(secs, 0)
+				m.lastUsed = time.Unix(secs, 0)
+			}
+		case "start":
+			// A spec this version can't read is kept as is rather than lost.
+			if st, err := ParseStartup(unescapeToken(val)); err == nil {
+				m.start = st
+			} else {
+				m.extra = append(m.extra, tok)
+			}
+		default:
+			if key != "" {
+				m.extra = append(m.extra, tok)
 			}
 		}
 	}
-	return tags, env, fav, lastUsed
+	return m
 }
 
-// formatMeta renders h's sshc metadata as a Host-line comment body (the text
-// that follows '#'), or "" when the host carries no metadata worth recording.
-// Tag and env tokens are space-free so they round-trip through the
-// whitespace-delimited comment.
-func formatMeta(h Host) string {
+// formatMeta renders m as a Host-line comment body (the text that follows
+// '#'), or "" when there is no metadata worth recording. Tag and env tokens
+// are space-free so they round-trip through the whitespace-delimited comment;
+// the startup spec is percent-escaped for the same reason.
+func formatMeta(m meta) string {
 	var parts []string
-	if env := sanitizeToken(h.Env); env != "" {
+	if env := sanitizeToken(m.env); env != "" {
 		parts = append(parts, "env="+env)
 	}
-	if tags := sanitizeTags(h.Tags); len(tags) > 0 {
+	if tags := sanitizeTags(m.tags); len(tags) > 0 {
 		parts = append(parts, "tags="+strings.Join(tags, ","))
 	}
-	if h.Fav {
+	if m.fav {
 		parts = append(parts, "fav=1")
 	}
-	if !h.LastUsed.IsZero() {
-		parts = append(parts, "used="+strconv.FormatInt(h.LastUsed.Unix(), 10))
+	if !m.lastUsed.IsZero() {
+		parts = append(parts, "used="+strconv.FormatInt(m.lastUsed.Unix(), 10))
 	}
+	if spec := m.start.String(); spec != "" {
+		parts = append(parts, "start="+escapeToken(spec))
+	}
+	parts = append(parts, m.extra...)
 	if len(parts) == 0 {
 		return ""
 	}
 	return metaPrefix + " " + strings.Join(parts, " ")
+}
+
+// escapeToken percent-escapes the bytes that can't sit in a whitespace-
+// delimited comment token: whitespace, control bytes and '%' itself.
+func escapeToken(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c <= ' ' || c == 0x7f || c == '%' {
+			fmt.Fprintf(&b, "%%%02X", c)
+		} else {
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
+// unescapeToken reverses escapeToken. A malformed escape is kept literally.
+func unescapeToken(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '%' && i+2 < len(s) {
+			if v, err := strconv.ParseUint(s[i+1:i+3], 16, 8); err == nil {
+				b.WriteByte(byte(v))
+				i += 2
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
 }
 
 // sanitizeToken normalises a metadata value for the space-delimited comment

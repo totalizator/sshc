@@ -1,6 +1,10 @@
 package tui
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/totalizator/sshc/ssh"
+)
 
 // newForm builds a form with the given field values, mirroring how the TUI
 // seeds f.values during editing.
@@ -72,6 +76,10 @@ func TestValidate(t *testing.T) {
 		{"space in alias", map[string]string{"alias": "my server"}, true},
 		{"space in fallback host-as-alias", map[string]string{"host": "my host"}, true},
 		{"space in host but explicit alias ok", map[string]string{"alias": "web", "host": "10.0.0.7"}, false},
+		{"startup tmux", map[string]string{"alias": "web", "start": "tmux:main"}, false},
+		{"startup blank", map[string]string{"alias": "web", "start": "  "}, false},
+		{"startup bad name", map[string]string{"alias": "web", "start": "tmux:my session"}, true},
+		{"startup unknown kind", map[string]string{"alias": "web", "start": "mosh:x"}, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -79,5 +87,16 @@ func TestValidate(t *testing.T) {
 				t.Fatalf("validate() err=%v, want err=%v", got, c.wantErr)
 			}
 		})
+	}
+}
+
+func TestStartupRoundTripsThroughForm(t *testing.T) {
+	in := ssh.Host{Alias: "web", HostName: "10.0.0.7", Start: ssh.Startup{Kind: ssh.StartTmux, Name: "main", Share: true}}
+	f := formFromHost(in, "edit", in.Alias, true)
+	if got := f.values["start"]; got != "tmux:main:share" {
+		t.Fatalf("start field = %q", got)
+	}
+	if out := f.toHost("config"); out.Start != in.Start {
+		t.Fatalf("toHost start = %+v, want %+v", out.Start, in.Start)
 	}
 }

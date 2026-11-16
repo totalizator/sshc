@@ -38,7 +38,8 @@ func TestMetaRoundTrip(t *testing.T) {
 func TestParseMetaStripsControlBytes(t *testing.T) {
 	// A stray NUL in env/tags (from a corrupted write) must be stripped on read
 	// so chip colours stay stable and the value heals on the next save.
-	tags, env, _, _ := parseMeta("sshc env=PROD\x00 tags=web\x00,db")
+	m := parseMeta("sshc env=PROD\x00 tags=web\x00,db")
+	tags, env := m.tags, m.env
 	if env != "PROD" {
 		t.Errorf("env = %q, want %q", env, "PROD")
 	}
@@ -47,17 +48,17 @@ func TestParseMetaStripsControlBytes(t *testing.T) {
 	}
 
 	// A value that is only a control byte must read as empty (no chip).
-	_, env, _, _ = parseMeta("sshc env=\x00")
+	env = parseMeta("sshc env=\x00").env
 	if env != "" {
 		t.Errorf("control-only env = %q, want empty", env)
 	}
 }
 
 func TestFormatMetaStripsControlBytes(t *testing.T) {
-	if got := formatMeta(Host{Env: "PROD\x00"}); got != "sshc env=PROD" {
+	if got := formatMeta(meta{env: "PROD\x00"}); got != "sshc env=PROD" {
 		t.Errorf("formatMeta = %q, want %q", got, "sshc env=PROD")
 	}
-	if got := formatMeta(Host{Env: "\x00"}); got != "" {
+	if got := formatMeta(meta{env: "\x00"}); got != "" {
 		t.Errorf("control-only env should yield no metadata, got %q", got)
 	}
 }
