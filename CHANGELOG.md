@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-16
+
 ### Added
 
 - **Per-host startup.** A `start=` metadata token (form field **Startup**)
@@ -20,7 +22,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Unknown metadata survives rewrites.** `#sshc` tokens this version doesn't
   recognise (from a newer sshc) are kept verbatim when the Host line is
   rewritten, instead of being dropped.
-
 - **GitHub Actions CI/CD.** `.github/workflows/ci.yaml` runs gofmt / `go vet` /
   `go test` on pushes and PRs; `.github/workflows/release.yaml` cross-compiles
   Linux/macOS/Windows (amd64 + arm64) on each `v*` tag and attaches the archives
@@ -273,7 +274,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Newly added and edited host blocks are written without indentation
   (cosmetic; valid and re-parseable). Untouched blocks are unaffected.
-  *(Resolved in [Unreleased]: sshc now indents the blocks it writes.)*
+  *(Resolved in [0.4.0]: sshc now indents the blocks it writes.)*
 
 ## [0.0.0] — scaffold
 
