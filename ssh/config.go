@@ -44,7 +44,7 @@ func loadFile(path string, primary bool) ([]Host, error) {
 		concrete := isConcrete(block)
 		// sshc metadata rides on the Host line's trailing comment; it only makes
 		// sense for single-pattern blocks (the same ones we treat as editable).
-		tags, env, fav, lastUsed := parseMeta(block.EOLComment)
+		m := parseMeta(block.EOLComment)
 		for _, pat := range block.Patterns {
 			alias := pat.String()
 			if alias == "" || alias == "*" {
@@ -58,10 +58,11 @@ func loadFile(path string, primary bool) ([]Host, error) {
 				IdentityFile: nodeValue(block, "IdentityFile"),
 				ProxyJump:    nodeValue(block, "ProxyJump"),
 				ProxyCommand: nodeValue(block, "ProxyCommand"),
-				Tags:         tags,
-				Env:          env,
-				Fav:          fav,
-				LastUsed:     lastUsed,
+				Tags:         m.tags,
+				Env:          m.env,
+				Fav:          m.fav,
+				LastUsed:     m.lastUsed,
+				Start:        m.start,
 				Source:       path,
 				// Only a primary-config block with exactly one concrete pattern
 				// maps cleanly to a single editable entry.

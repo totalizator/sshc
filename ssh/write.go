@@ -54,7 +54,7 @@ func Update(path, oldAlias string, h Host) error {
 			}
 			block.Patterns = []*ssh_config.Pattern{pat}
 		}
-		block.EOLComment = formatMeta(h)
+		block.EOLComment = formatMeta(metaOf(h, parseMeta(block.EOLComment)))
 		applyFields(block, h)
 		return []*ssh_config.Host{block}, nil
 	})
@@ -86,8 +86,9 @@ func TouchLastUsed(path, alias string, now time.Time) error {
 			return nil, errNoChange
 		}
 		block := cfg.Hosts[idx]
-		tags, env, fav, _ := parseMeta(block.EOLComment)
-		block.EOLComment = formatMeta(Host{Tags: tags, Env: env, Fav: fav, LastUsed: now})
+		m := parseMeta(block.EOLComment)
+		m.lastUsed = now
+		block.EOLComment = formatMeta(m)
 		return nil, nil
 	})
 }
@@ -105,8 +106,9 @@ func SetFav(path, alias string, fav bool) error {
 			return nil, fmt.Errorf("host %q not found", alias)
 		}
 		block := cfg.Hosts[idx]
-		tags, env, _, used := parseMeta(block.EOLComment)
-		block.EOLComment = formatMeta(Host{Tags: tags, Env: env, Fav: fav, LastUsed: used})
+		m := parseMeta(block.EOLComment)
+		m.fav = fav
+		block.EOLComment = formatMeta(m)
 		return nil, nil
 	})
 }
@@ -122,7 +124,7 @@ func StripMeta(path string) (int, error) {
 	n := 0
 	err := mutate(path, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
 		for _, host := range cfg.Hosts {
-			if tags, env, fav, used := parseMeta(host.EOLComment); len(tags) > 0 || env != "" || fav || !used.IsZero() {
+			if parseMeta(host.EOLComment).recognised() {
 				host.EOLComment = ""
 				n++
 			}
@@ -230,7 +232,7 @@ func buildBlock(h Host) (*ssh_config.Host, error) {
 	}
 	block := &ssh_config.Host{
 		Patterns:   []*ssh_config.Pattern{pat},
-		EOLComment: formatMeta(h),
+		EOLComment: formatMeta(metaOf(h, meta{})),
 	}
 	add := func(key, val string) {
 		val = strings.TrimSpace(val)

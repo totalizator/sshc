@@ -26,6 +26,9 @@ the selected host at a glance.
 - **Per-host metadata:** tags, a free-form env label (coloured chip), and
   favourites (`★`), stored as a structured `#sshc …` comment that keeps the file
   valid for plain `ssh`
+- **Per-host startup:** attach to a tmux, screen or zellij session (or run any
+  command) in place of the login shell, without breaking `ssh host cmd`,
+  rsync or git for that host
 - Most-recently-used ordering with relative "… ago" labels; favourites float to
   the top
 - Persistent TOML config (`os.UserConfigDir()/sshc/config.toml`) with a live,
@@ -184,6 +187,37 @@ use a fixed colour for the presets `prod`, `staging`, `dev`, `home`, and `cloud`
 and a stable derived hue for any other value. Connecting stamps `used=` so the
 list can order by most-recent-first (this best-effort write only touches the
 primary, writable config).
+
+### Startup
+
+The form's **Startup** field picks what a session runs instead of the login
+shell. It is stored as a `start=` token in the same comment, so the Android
+app uses it too:
+
+| Startup            | Runs                                                        |
+| ------------------ | ----------------------------------------------------------- |
+| `tmux:main`        | attaches to tmux session `main`, creating it if needed     |
+| `tmux:main:share`  | the same, but leaves other attached clients alone          |
+| `screen:main`      | the same with GNU screen (`:share` works here too)         |
+| `zellij:main`      | attaches to zellij session `main`, creating it if needed   |
+| `cmd:htop -d 5`    | any command line                                            |
+
+sshc connects with `ssh -t <host> '<command>'`, so leaving the program
+(detaching from tmux, `exit`) ends the connection. By default a multiplexer
+**takes the session over**: other clients still attached, such as a terminal
+left open on another machine, are detached, so the window isn't held to the
+smallest screen. If tmux, screen or zellij isn't installed on the host, you
+get your login shell with a note instead.
+
+This is deliberately not OpenSSH's `RemoteCommand`: plain `ssh` would honour
+it too, and OpenSSH refuses a command line while it is set, which breaks
+`ssh host uptime`, rsync and git over ssh. The startup applies only when you
+connect from sshc with an `ssh` template.
+
+sshc from this version on keeps metadata keys it doesn't know when it
+rewrites a Host line. Older versions drop them (for example when they stamp
+`used=` on connect), so update every sshc that writes to a config holding
+`start=`.
 
 ### Template variables
 

@@ -8,6 +8,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Per-host startup.** A `start=` metadata token (form field **Startup**)
+  runs a tmux, screen or zellij session (`tmux:main`, `screen:main`,
+  `zellij:main`) or any command (`cmd:…`) in place of the login shell, via
+  `ssh -t host '<command>'`. Multiplexers take the session over (other
+  clients are detached) unless `:share` is added, and fall back to the login
+  shell when the tool is missing. Stored as sshc metadata rather than
+  `RemoteCommand`, so `ssh host cmd`, rsync and git over ssh keep working.
+  The shared logic (`ssh.ParseStartup`, `Startup.Command`) is exported for
+  the Android app.
+- **Unknown metadata survives rewrites.** `#sshc` tokens this version doesn't
+  recognise (from a newer sshc) are kept verbatim when the Host line is
+  rewritten, instead of being dropped.
+
 - **GitHub Actions CI/CD.** `.github/workflows/ci.yaml` runs gofmt / `go vet` /
   `go test` on pushes and PRs; `.github/workflows/release.yaml` cross-compiles
   Linux/macOS/Windows (amd64 + arm64) on each `v*` tag and attaches the archives

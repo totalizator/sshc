@@ -40,6 +40,9 @@ func (m Model) detailView(h ssh.Host, w int) string {
 	proxy := h.Proxy()
 	b.WriteString(m.kv("ProxyJump", orPlaceholder(proxy, "(direct)"), proxy == ""))
 
+	b.WriteString(m.section("session"))
+	b.WriteString(m.kv("Startup", startupLabel(h.Start), h.Start.IsZero()))
+
 	b.WriteString(m.section("meta"))
 	b.WriteString(m.kv("Tags", tagList(h.Tags), len(h.Tags) == 0))
 	b.WriteString(m.kv("Last used", ssh.LastUsedLabel(h.LastUsed), h.LastUsed.IsZero()))
@@ -91,6 +94,23 @@ func resolvedCommand(h ssh.Host) string {
 		parts = append(parts, "-p "+p)
 	}
 	return strings.Join(parts, " ")
+}
+
+// startupLabel describes what a session runs instead of the login shell.
+func startupLabel(s ssh.Startup) string {
+	switch s.Kind {
+	case "":
+		return "(login shell)"
+	case ssh.StartCmd:
+		return s.Cmd
+	case ssh.StartZellij:
+		return "zellij · " + s.Name
+	}
+	mode := "takes over"
+	if s.Share {
+		mode = "shared"
+	}
+	return s.Kind + " · " + s.Name + " (" + mode + ")"
 }
 
 func tagList(tags []string) string {

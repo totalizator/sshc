@@ -709,6 +709,12 @@ func connectArgs(h ssh.Host, tmpl, sessionUser string) ([]string, error) {
 	if sessionUser != "" && !strings.Contains(tmpl, "{{{user}}}") && looksLikeSSH(args[0]) {
 		args = append([]string{args[0], "-l", sessionUser}, args[1:]...)
 	}
+	// A host with a startup runs it in place of the login shell, on a TTY
+	// (ssh -t host '<command>'). Only the ssh client takes it this way.
+	if cmd := h.Start.Command(false); cmd != "" && looksLikeSSH(args[0]) {
+		args = append([]string{args[0], "-t"}, args[1:]...)
+		args = append(args, cmd)
+	}
 	return args, nil
 }
 

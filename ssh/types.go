@@ -22,6 +22,7 @@ type Host struct {
 	Env      string    // free-form environment label (drives the env chip)
 	Fav      bool      // pinned/favourite
 	LastUsed time.Time // last connect time; zero when never used
+	Start    Startup   // what a session runs instead of the login shell (startup.go)
 
 	// Source is the path of the config file this block was read from.
 	Source string

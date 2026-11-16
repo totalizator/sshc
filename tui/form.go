@@ -26,6 +26,7 @@ var formFields = []formField{
 	{"proxy", "ProxyJump", "bastion (optional)"},
 	{"tags", "Tags", "web, prod (comma-sep)"},
 	{"env", "Env", "prod, dev, edge…  (optional, free-form)"},
+	{"start", "Startup", "tmux:main · screen:… · zellij:… · cmd:…  (optional)"},
 }
 
 // userPlaceholder hints the ssh default (the local username) for the blank User
@@ -74,6 +75,7 @@ func formFromHost(h ssh.Host, title, alias string, editing bool) formModel {
 			"proxy":    h.ProxyJump,
 			"tags":     strings.Join(h.Tags, ", "),
 			"env":      h.Env,
+			"start":    h.Start.String(),
 		},
 	}
 	if editing {
@@ -129,6 +131,9 @@ func (f formModel) validate() string {
 	if strings.ContainsAny(alias, " \t") {
 		return "alias can't contain spaces (ssh reads each word as a separate host)"
 	}
+	if _, err := ssh.ParseStartup(f.values["start"]); err != nil {
+		return "startup: " + err.Error()
+	}
 	return ""
 }
 
@@ -164,6 +169,9 @@ func (f formModel) toHost(source string) ssh.Host {
 		}
 	}
 
+	// validate has already rejected a spec that doesn't parse.
+	start, _ := ssh.ParseStartup(val("start"))
+
 	proxyJump := val("proxy")
 	proxyCommand := ""
 	if proxyJump == "" {
@@ -180,6 +188,7 @@ func (f formModel) toHost(source string) ssh.Host {
 		ProxyCommand: proxyCommand,
 		Tags:         tags,
 		Env:          val("env"),
+		Start:        start,
 		Source:       source,
 		Editable:     true,
 	}
