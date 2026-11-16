@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Port forwards from the config.** `LocalForward` / `RemoteForward`
+  directives are parsed into `Host.Forwards` (`ssh.ParseForward`,
+  `Forward.ListenAddr` / `TargetAddr` with OpenSSH's bind defaults) and listed
+  in the details pane as `-L` / `-R` flags. Forms that aren't TCP forwards
+  (unix sockets, `DynamicForward`) land in `Host.OtherForwards` and show
+  greyed out. sshc still never writes these directives; the Android app uses
+  the parsed list to start forwards on connect.
+
 ## [0.5.0] — 2026-11-16
 
 ### Added
