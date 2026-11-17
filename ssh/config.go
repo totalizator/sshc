@@ -66,6 +66,7 @@ func loadFile(path string, primary bool) ([]Host, error) {
 				Fav:           m.fav,
 				LastUsed:      m.lastUsed,
 				Start:         m.start,
+				Run:           m.run,
 				Source:        path,
 				// Only a primary-config block with exactly one concrete pattern
 				// maps cleanly to a single editable entry.

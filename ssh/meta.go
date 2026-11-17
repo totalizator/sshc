@@ -24,6 +24,7 @@ type meta struct {
 	fav      bool
 	lastUsed time.Time
 	start    Startup
+	run      []RunStep
 	// extra holds key=value tokens this version doesn't know (written by a
 	// newer sshc), kept verbatim so rewriting the line doesn't drop them.
 	extra []string
@@ -31,12 +32,12 @@ type meta struct {
 
 // recognised reports whether m has at least one key this version knows.
 func (m meta) recognised() bool {
-	return len(m.tags) > 0 || m.env != "" || m.fav || !m.lastUsed.IsZero() || !m.start.IsZero()
+	return len(m.tags) > 0 || m.env != "" || m.fav || !m.lastUsed.IsZero() || !m.start.IsZero() || len(m.run) > 0
 }
 
 // metaOf takes h's metadata, keeping the unknown tokens of prev.
 func metaOf(h Host, prev meta) meta {
-	return meta{tags: h.Tags, env: h.Env, fav: h.Fav, lastUsed: h.LastUsed, start: h.Start, extra: prev.extra}
+	return meta{tags: h.Tags, env: h.Env, fav: h.Fav, lastUsed: h.LastUsed, start: h.Start, run: h.Run, extra: prev.extra}
 }
 
 // parseMeta reads the sshc metadata carried in a Host line's EOL comment. The
@@ -76,6 +77,12 @@ func parseMeta(comment string) meta {
 			} else {
 				m.extra = append(m.extra, tok)
 			}
+		case "run":
+			if st, ok := parseRunStep(val); ok {
+				m.run = append(m.run, st)
+			} else {
+				m.extra = append(m.extra, tok)
+			}
 		default:
 			if key != "" {
 				m.extra = append(m.extra, tok)
@@ -105,6 +112,11 @@ func formatMeta(m meta) string {
 	}
 	if spec := m.start.String(); spec != "" {
 		parts = append(parts, "start="+escapeToken(spec))
+	}
+	for _, st := range m.run {
+		if st.valid() {
+			parts = append(parts, st.token())
+		}
 	}
 	parts = append(parts, m.extra...)
 	if len(parts) == 0 {

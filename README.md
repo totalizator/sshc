@@ -219,6 +219,20 @@ rewrites a Host line. Older versions drop them (for example when they stamp
 `used=` on connect), so update every sshc that writes to a config holding
 `start=`.
 
+### After-login commands
+
+The Android app can type a list of commands into the login shell after it
+connects (`cd /srv/app`, `source venv/bin/activate`, …). The list is stored
+as repeated `run=` tokens in the same comment, percent-escaped like `start=`;
+`run=-…` is a step that is switched off:
+
+```
+Host box #sshc run=cd%20/srv/app run=-htop
+```
+
+Desktop sshc can't type into the `ssh` it starts, so it only shows them in the
+details pane and keeps them when you edit or clone the host.
+
 ### Port forwards
 
 `LocalForward` and `RemoteForward` lines in a host block are listed in the

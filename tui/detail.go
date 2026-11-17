@@ -42,6 +42,13 @@ func (m Model) detailView(h ssh.Host, w int) string {
 
 	b.WriteString(m.section("session"))
 	b.WriteString(m.kv("Startup", startupLabel(h.Start), h.Start.IsZero()))
+	for _, r := range h.Run {
+		cmd := r.Cmd
+		if r.Off {
+			cmd += " (off)"
+		}
+		b.WriteString(m.kv("After login", cmd, r.Off))
+	}
 	for _, f := range h.Forwards {
 		b.WriteString(m.kv("Forward", f.String(), false))
 	}
