@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Five backups instead of one, and connecting no longer replaces them.**
+  Each write that changes the config moves the previous backup to
+  `.sshc.bak.1` … `.sshc.bak.4`. Stamping `used=` on connect and toggling a
+  favourite make no backup, so the last real edit stays recoverable; before,
+  a single connect after a mistaken delete overwrote the only copy with the
+  host. `ssh.Backups` / `ssh.Restore` / `ssh.Replace` are exported for the
+  Android app's restore.
+- **Writes are atomic.** The config is written to a temporary file and
+  renamed over the original.
+
+### Fixed
+
+- **Deleting a host no longer deletes the next host's label.** A comment
+  directly above a `Host` line was parsed into the block above it, so it went
+  with that block on delete, and editing the labelled host put a blank line
+  between them. Such comments now stay with the host they label.
+
 ### Added
 
 - **Port forwards from the config.** `LocalForward` / `RemoteForward`

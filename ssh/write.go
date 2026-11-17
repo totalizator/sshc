@@ -16,7 +16,7 @@ const backupSuffix = ".sshc.bak"
 
 // Add appends a new host block to the primary config at path.
 func Add(path string, h Host) error {
-	return mutate(path, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
+	return mutate(path, true, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
 		if findBlock(cfg, h.Alias) != -1 {
 			return nil, fmt.Errorf("host %q already exists", h.Alias)
 		}
@@ -34,7 +34,7 @@ func Add(path string, h Host) error {
 // without losing round-trip fidelity), so the edited block is reformatted while
 // every untouched block is preserved byte-for-byte.
 func Update(path, oldAlias string, h Host) error {
-	return mutate(path, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
+	return mutate(path, true, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
 		idx := findBlock(cfg, oldAlias)
 		if idx == -1 {
 			return nil, fmt.Errorf("host %q not found", oldAlias)
@@ -62,7 +62,7 @@ func Update(path, oldAlias string, h Host) error {
 
 // Delete removes the block identified by alias.
 func Delete(path, alias string) error {
-	return mutate(path, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
+	return mutate(path, true, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
 		idx := findBlock(cfg, alias)
 		if idx == -1 {
 			return nil, fmt.Errorf("host %q not found", alias)
@@ -80,7 +80,9 @@ func TouchLastUsed(path, alias string, now time.Time) error {
 	if path == "" {
 		return nil
 	}
-	return mutate(path, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
+	// No backup: a connect would otherwise push the last real edit out of
+	// the backups. Only the Host-line comment changes.
+	return mutate(path, false, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
 		idx := findBlock(cfg, alias)
 		if idx == -1 {
 			return nil, errNoChange
@@ -100,7 +102,8 @@ func SetFav(path, alias string, fav bool) error {
 	if path == "" {
 		return fmt.Errorf("no writable config configured")
 	}
-	return mutate(path, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
+	// No backup, as in TouchLastUsed.
+	return mutate(path, false, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
 		idx := findBlock(cfg, alias)
 		if idx == -1 {
 			return nil, fmt.Errorf("host %q not found", alias)
@@ -122,7 +125,7 @@ func SetFav(path, alias string, fav bool) error {
 // a file with no sshc metadata is left untouched (no write, no backup).
 func StripMeta(path string) (int, error) {
 	n := 0
-	err := mutate(path, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
+	err := mutate(path, true, func(cfg *ssh_config.Config) ([]*ssh_config.Host, error) {
 		for _, host := range cfg.Hosts {
 			if parseMeta(host.EOLComment).recognised() {
 				host.EOLComment = ""
@@ -148,9 +151,15 @@ var errNoChange = fmt.Errorf("no change")
 //     rather than clobbered from a stale snapshot)
 //  2. parse it and apply fn
 //  3. re-parse the rendered result to guard against producing a corrupt file
-//  4. back up the original to <path>.sshc.bak
+//  4. back up the original (rotating, see backupFile) unless backup is false,
+//     which only the metadata-only writes (used=, fav) pass
 //  5. write the new content
-func mutate(path string, fn func(*ssh_config.Config) ([]*ssh_config.Host, error)) error {
+//
+// Before fn runs, the comment lines directly above each Host line are moved
+// from the block they parse into (the previous one) to the host they label
+// (see detachLabels), so deleting or editing a host keeps its neighbour's
+// label in place.
+func mutate(path string, backup bool, fn func(*ssh_config.Config) ([]*ssh_config.Host, error)) error {
 	if path == "" {
 		return fmt.Errorf("no writable config configured")
 	}
@@ -165,6 +174,7 @@ func mutate(path string, fn func(*ssh_config.Config) ([]*ssh_config.Host, error)
 		return fmt.Errorf("parse %s: %w", path, err)
 	}
 
+	labels := detachLabels(cfg)
 	owned, err := fn(cfg)
 	if err != nil {
 		if err == errNoChange {
@@ -184,23 +194,75 @@ func mutate(path string, fn func(*ssh_config.Config) ([]*ssh_config.Host, error)
 	// Ctrl+Space keystroke or an already-corrupt file). Only tab/newline/CR are
 	// legal control characters in a config; strip the rest so the written file
 	// is always clean regardless of how the byte got in.
-	out := stripControlBytes(render(cfg, ownedSet))
+	out := stripControlBytes(render(cfg, ownedSet, labels))
 	if _, err := ssh_config.DecodeBytes([]byte(out)); err != nil {
 		return fmt.Errorf("refusing to write corrupt config: %w", err)
 	}
 
-	if original != nil {
-		if err := os.WriteFile(path+backupSuffix, original, 0o600); err != nil {
-			return fmt.Errorf("backup failed: %w", err)
-		}
-	}
-
-	if dir := filepath.Dir(path); dir != "" {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
+	if original != nil && backup {
+		if err := backupFile(path, original); err != nil {
 			return err
 		}
 	}
-	return os.WriteFile(path, []byte(out), 0o600)
+	return writeFile(path, []byte(out))
+}
+
+// writeFile writes data to path through a temporary file and a rename, so a
+// crash mid-write leaves either the old or the new config, never half of one.
+func writeFile(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name()) // no-op after a successful rename
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
+}
+
+// detachLabels moves, for every pair of neighbouring hosts, the comment lines
+// directly above the second Host line out of the first block and returns them
+// keyed by the host they sit above. The parser puts a comment between two
+// blocks into the earlier block, so without this, deleting a host drops the
+// label of the one below it ("# --- prod ---" above "Host b" vanishes with
+// "Host a").
+//
+// A label is the run of comment lines right before the Host line, with no
+// blank line between, and not indented: an indented comment at the end of a
+// block is block content (often a commented-out directive). Comments above
+// the first host stay where they are, in the file's header, since they are
+// as likely to describe the file as the host.
+func detachLabels(cfg *ssh_config.Config) map[*ssh_config.Host][]ssh_config.Node {
+	labels := map[*ssh_config.Host][]ssh_config.Node{}
+	for i := 1; i+1 < len(cfg.Hosts); i++ {
+		prev := cfg.Hosts[i]
+		j := len(prev.Nodes)
+		for j > 0 {
+			e, ok := prev.Nodes[j-1].(*ssh_config.Empty)
+			if !ok || e.Comment == "" || !strings.HasPrefix(e.String(), "#") {
+				break
+			}
+			j--
+		}
+		if j < len(prev.Nodes) {
+			labels[cfg.Hosts[i+1]] = append([]ssh_config.Node(nil), prev.Nodes[j:]...)
+			prev.Nodes = prev.Nodes[:j]
+		}
+	}
+	return labels
 }
 
 // validateAlias rejects aliases the SSH config grammar can't represent as a
@@ -329,7 +391,10 @@ const indentUnit = "    "
 // built — are rendered in canonical style (indented directives) instead of
 // flush-left. Every other block is emitted by the library's faithful
 // block.String(), so untouched blocks stay byte-for-byte intact.
-func render(cfg *ssh_config.Config, owned map[*ssh_config.Host]bool) string {
+//
+// labels (from detachLabels) are written right above the host they belong to,
+// after any separator, so the result for untouched blocks is unchanged.
+func render(cfg *ssh_config.Config, owned map[*ssh_config.Host]bool, labels map[*ssh_config.Host][]ssh_config.Node) string {
 	var b strings.Builder
 	for i, host := range cfg.Hosts {
 		// Guarantee a blank-line separator at the boundary of an owned block: a
@@ -349,6 +414,10 @@ func render(cfg *ssh_config.Config, owned map[*ssh_config.Host]bool) string {
 					b.WriteString("\n\n")
 				}
 			}
+		}
+		for _, node := range labels[host] {
+			b.WriteString(node.String())
+			b.WriteByte('\n')
 		}
 		if owned[host] {
 			b.WriteString(canonicalBlock(host))

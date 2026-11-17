@@ -26,12 +26,42 @@ Every mutation runs through `mutate`, a safe read-modify-write cycle:
    stray NUL (e.g. from a `Ctrl+Space` keystroke) must never reach disk.
 6. **Re-parse guard**: the rendered bytes are parsed again; if that fails, the
    write is refused. This is the backstop against producing a corrupt file.
-7. **Back up** the original to `<path>.sshc.bak`.
-8. **Write** the new content (`0o600`, creating the dir if needed).
+7. **Back up** the original to `<path>.sshc.bak`, rotating older backups to
+   `.sshc.bak.1` … `.sshc.bak.4` (`BackupsKept` = 5, `backup.go`). The
+   metadata-only writes (`TouchLastUsed`, `SetFav`) skip this step: a connect
+   stamps `used=`, and when every connect made a backup, one connect after a
+   mistaken delete overwrote the only copy that still had the host.
+8. **Write** the new content (`0o600`, creating the dir if needed) to a
+   temporary file in the same directory and rename it over the config.
 
 The re-parse guard + backup are the two properties that make everything else
 safe: a logic bug downstream can at worst refuse to write, and the previous
-content is always recoverable from `.sshc.bak`.
+content of every structural write is recoverable from the backups.
+`Backups` lists them, `Restore` puts one back (backing up the current config
+first, so a restore can be undone), and `Replace` is the same path for a whole
+new file (the Android app's import).
+
+## Labels (`detachLabels`)
+
+The parser puts every line up to the next `Host` into the current block, so a
+comment between two blocks belongs to the one *above*:
+
+```
+Host a
+  HostName 10.0.0.1
+
+# --- prod ---      ← parsed as part of "a"
+Host b
+```
+
+Deleting `a` used to drop `b`'s label, and editing `b` put a blank line
+between `b` and its label. `mutate` now moves such a label to the host below
+before the closure runs, and `render` writes it right above that host. A
+label is the run of comment lines immediately above the `Host` line, with no
+blank line between, at column 0; an indented comment at the end of a block
+(often a commented-out directive) stays block content. Comments above the
+first host stay in the file header. Untouched output is unchanged, since a
+node renders the same whichever block holds it.
 
 ## The ownership model (`render` / `canonicalBlock`)
 
@@ -100,7 +130,7 @@ Two `kevinburke/ssh_config` (v1.6.0) internals force this design:
 - Untouched blocks are preserved byte-for-byte (modulo the tab caveat below).
 - Editing a host never drops unmodeled directives, comments, or quoted values.
 - A write is never committed unless it re-parses cleanly; the prior file is
-  always backed up to `.sshc.bak`.
+  always backed up (`.sshc.bak`, five kept) unless only `used=`/`fav` changed.
 - The file sshc writes is always free of control bytes other than tab/newline/CR.
 
 ## Known limitations & follow-up work

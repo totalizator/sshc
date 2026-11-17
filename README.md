@@ -42,7 +42,7 @@ the selected host at a glance.
 > that every `ssh`, `scp`, `git`-over-ssh, and rsync session on your machine
 > leans on. The safeguards under [Write safety](#write-safety) exist precisely
 > because that file matters, and in normal use your config is safe and any write
-> is recoverable from `.sshc.bak`. But this is software, software has bugs, and
+> is recoverable from the `.sshc.bak` backups. But this is software, software has bugs, and
 > sshc is provided **as-is, with no warranty** (see [`LICENSE`](LICENSE)) - if a
 > write ever mangles your config, recovering it is on you. Keep `~/.ssh/config`
 > under version control or a backup you trust, and you'll never have a bad day
@@ -105,7 +105,7 @@ sshc clean [--dry-run]   Remove sshc's "#sshc …" metadata comments from the
                          writable config, returning it to plain-ssh form.
                          Favourites/tags/env/last-used are discarded; directives,
                          other comments, and indentation are left untouched, and
-                         the original is backed up to <config>.sshc.bak first.
+                         the original is backed up first (see Write safety).
                          --dry-run reports the count without writing.
 ```
 
@@ -249,8 +249,19 @@ When you add, edit, or delete a host, sshc:
 1. Re-reads the primary config from disk (external edits are picked up, not clobbered)
 2. Applies the change to a parsed model
 3. Re-parses the rendered result and aborts if it would be corrupt
-4. Backs the original up to `<config>.sshc.bak`
-5. Writes the new content
+4. Backs the original up to `<config>.sshc.bak`, moving older backups to
+   `.sshc.bak.1` … `.sshc.bak.4` (five versions are kept)
+5. Writes the new content to a temporary file and renames it over the config,
+   so an interrupted write never leaves half a file
+
+Stamping last-used on connect and toggling a favourite change only the
+`#sshc` comment and make no backup, so connecting a few times doesn't push
+your last real edit out of the backups. To go back, copy a backup over the
+config (the Android app has *Restore previous config* for this).
+
+Comment lines directly above a `Host` line (with no blank line between) are
+that host's label: they stay with it when you edit it and go with it when you
+delete it, instead of sticking to the host above.
 
 Only the **first** `--config` path is writable; all other configs and any
 `Host *` / `Match` / wildcard blocks are read-only and excluded from edit and
