@@ -42,6 +42,12 @@ func (m Model) detailView(h ssh.Host, w int) string {
 
 	b.WriteString(m.section("session"))
 	b.WriteString(m.kv("Startup", startupLabel(h.Start), h.Start.IsZero()))
+	for _, f := range h.Forwards {
+		b.WriteString(m.kv("Forward", f.String(), false))
+	}
+	for _, o := range h.OtherForwards {
+		b.WriteString(m.kv("Forward", o, true))
+	}
 
 	b.WriteString(m.section("meta"))
 	b.WriteString(m.kv("Tags", tagList(h.Tags), len(h.Tags) == 0))

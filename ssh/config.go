@@ -45,25 +45,28 @@ func loadFile(path string, primary bool) ([]Host, error) {
 		// sshc metadata rides on the Host line's trailing comment; it only makes
 		// sense for single-pattern blocks (the same ones we treat as editable).
 		m := parseMeta(block.EOLComment)
+		fwd, otherFwd := forwardsOf(block)
 		for _, pat := range block.Patterns {
 			alias := pat.String()
 			if alias == "" || alias == "*" {
 				continue
 			}
 			hosts = append(hosts, Host{
-				Alias:        alias,
-				HostName:     nodeValue(block, "HostName"),
-				User:         nodeValue(block, "User"),
-				Port:         nodeValue(block, "Port"),
-				IdentityFile: nodeValue(block, "IdentityFile"),
-				ProxyJump:    nodeValue(block, "ProxyJump"),
-				ProxyCommand: nodeValue(block, "ProxyCommand"),
-				Tags:         m.tags,
-				Env:          m.env,
-				Fav:          m.fav,
-				LastUsed:     m.lastUsed,
-				Start:        m.start,
-				Source:       path,
+				Alias:         alias,
+				HostName:      nodeValue(block, "HostName"),
+				User:          nodeValue(block, "User"),
+				Port:          nodeValue(block, "Port"),
+				IdentityFile:  nodeValue(block, "IdentityFile"),
+				ProxyJump:     nodeValue(block, "ProxyJump"),
+				ProxyCommand:  nodeValue(block, "ProxyCommand"),
+				Forwards:      fwd,
+				OtherForwards: otherFwd,
+				Tags:          m.tags,
+				Env:           m.env,
+				Fav:           m.fav,
+				LastUsed:      m.lastUsed,
+				Start:         m.start,
+				Source:        path,
 				// Only a primary-config block with exactly one concrete pattern
 				// maps cleanly to a single editable entry.
 				Editable: primary && concrete && len(block.Patterns) == 1,

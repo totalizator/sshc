@@ -15,6 +15,13 @@ type Host struct {
 	ProxyJump    string
 	ProxyCommand string
 
+	// Port forwards from LocalForward / RemoteForward directives (forward.go).
+	// Read-only: sshc keeps the directives as written and never writes these.
+	Forwards []Forward
+	// OtherForwards holds forward directives Forwards can't represent (unix
+	// sockets, DynamicForward, malformed ones) as text, e.g. "DynamicForward 1080".
+	OtherForwards []string
+
 	// sshc-managed metadata. These are not native SSH keys; they are persisted
 	// as a structured "#sshc …" comment on the Host line (see meta.go) so the
 	// config stays valid for plain ssh.

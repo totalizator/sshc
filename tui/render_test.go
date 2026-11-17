@@ -204,3 +204,17 @@ func TestRenderVariants(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderDetailForwards(t *testing.T) {
+	h := ssh.Host{Alias: "box", HostName: "10.0.0.9", Editable: true, Source: "~/.ssh/config",
+		Forwards:      []ssh.Forward{{Port: 8080, Host: "localhost", HostPort: 80}, {Remote: true, Port: 9000, Host: "localhost", HostPort: 9000}},
+		OtherForwards: []string{"DynamicForward 1080"}}
+	m := newModel(Options{Hosts: []ssh.Host{h}, Version: "v0.5.0", Settings: DefaultSettings(), ConfigPaths: []string{"~/.ssh/config"}})
+	m.showDetail = true
+	out := strip(render(t, m, 120, 40))
+	for _, want := range []string{"-L 8080:localhost:80", "-R 9000:localhost:9000", "DynamicForward 1080"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("detail view missing %q:\n%s", want, out)
+		}
+	}
+}
