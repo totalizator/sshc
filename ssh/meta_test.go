@@ -170,3 +170,27 @@ func TestLastUsedLabel(t *testing.T) {
 		t.Errorf("zero time label = %q, want never", got)
 	}
 }
+
+func TestHasMetaCountsEveryRecognisedField(t *testing.T) {
+	if (Host{Alias: "a"}).HasMeta() {
+		t.Fatal("plain host has no metadata")
+	}
+	for name, h := range map[string]Host{
+		"tags": {Tags: []string{"web"}},
+		"env":  {Env: "prod"},
+		"fav":  {Fav: true},
+		"used": {LastUsed: time.Unix(1700000000, 0)},
+		"run":  {Run: []RunStep{{Cmd: "cd /srv"}}},
+	} {
+		if !h.HasMeta() {
+			t.Errorf("%s: HasMeta = false", name)
+		}
+	}
+	start, err := ParseStartup("tmux:main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !(Host{Start: start}).HasMeta() {
+		t.Error("start: HasMeta = false")
+	}
+}

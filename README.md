@@ -270,8 +270,16 @@ When you add, edit, or delete a host, sshc:
 
 Stamping last-used on connect and toggling a favourite change only the
 `#sshc` comment and make no backup, so connecting a few times doesn't push
-your last real edit out of the backups. To go back, copy a backup over the
-config (the Android app has *Restore previous config* for this).
+your last real edit out of the backups. To go back:
+
+```sh
+sshc restore        # list the backups, newest first
+sshc restore 2      # put backup 2 back
+```
+
+A restore first saves the current config as the newest backup, so
+`sshc restore 1` right after undoes it. (The Android app has the same as
+*Restore previous config*.)
 
 Comment lines directly above a `Host` line (with no blank line between) are
 that host's label: they stay with it when you edit it and go with it when you

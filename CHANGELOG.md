@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`sshc restore`** lists the config's backups (age, host count) and
+  `sshc restore N` puts one back. The current config is backed up first, so
+  `sshc restore 1` undoes a restore.
+
 ### Changed
 
 - **Five backups instead of one, and connecting no longer replaces them.**
@@ -20,6 +26,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`sshc clean --dry-run` counts hosts with only a startup or after-login
+  steps**, as `clean` itself strips them (`Host.HasMeta`).
 - **Editing a host no longer clears its favourite and last-used.** The form
   doesn't show them, and saving wrote the Host line from the form alone, so
   an edit dropped `fav=1` and `used=`. They're now carried through, as are
