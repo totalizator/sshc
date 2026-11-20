@@ -309,12 +309,17 @@ func buildBlock(h Host) (*ssh_config.Host, error) {
 	add("IdentityFile", h.IdentityFile)
 	add("ProxyJump", h.ProxyJump)
 	add("ProxyCommand", h.ProxyCommand)
+	for _, f := range h.Forwards {
+		key, value := f.Directive()
+		block.Nodes = append(block.Nodes, &ssh_config.KV{Key: key, Value: value})
+	}
 	return block, nil
 }
 
-// modeledKeys are the directives sshc represents as form fields. Everything else
-// in a host block (ForwardAgent, LocalForward, standalone comments, …) is opaque
-// to sshc and must survive an edit untouched.
+// modeledKeys are the directives sshc represents as form fields. TCP forward
+// lines are written from Host.Forwards (setForwards). Everything else in a host
+// block (ForwardAgent, DynamicForward, standalone comments, …) is opaque to
+// sshc and must survive an edit untouched.
 var modeledKeys = []string{"HostName", "User", "Port", "IdentityFile", "ProxyJump", "ProxyCommand"}
 
 // applyFields updates an existing block's modeled directives in place to match
@@ -332,6 +337,11 @@ func applyFields(block *ssh_config.Host, h Host) {
 	}
 	for _, key := range modeledKeys {
 		setDirective(block, key, vals[key])
+	}
+	// nil leaves the forward lines alone (callers that don't model them);
+	// an empty, non-nil list removes them.
+	if h.Forwards != nil {
+		setForwards(block, h.Forwards)
 	}
 }
 

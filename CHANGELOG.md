@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Port forwards can be written.** `Add` and `Update` write `Host.Forwards`
+  as `LocalForward` / `RemoteForward` lines when the list isn't nil, rewriting
+  them only when it changed; socket forwards and `DynamicForward` are kept as
+  written. `ssh.ParseForwardFlag` reads the `-L` / `-R` flag form and
+  `Forward.Directive` gives the config line. The Android app edits forwards in
+  its host form with this, and a clone in the TUI now copies them.
 - **`sshc restore`** lists the config's backups (age, host count) and
   `sshc restore N` puts one back. The current config is backed up first, so
   `sshc restore 1` undoes a restore.

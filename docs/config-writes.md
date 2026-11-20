@@ -100,8 +100,16 @@ existing block in place:
 - `applyFields` updates the six modeled directives
   (`HostName`, `User`, `Port`, `IdentityFile`, `ProxyJump`, `ProxyCommand`) via
   `setDirective`; every other node — unmodeled directives (`ForwardAgent`,
-  `LocalForward`, `SetEnv`, …), standalone comments, and blank lines — is left
+  `DynamicForward`, `SetEnv`, …), standalone comments, and blank lines — is left
   exactly where it was.
+- TCP forward lines (`LocalForward` / `RemoteForward`) are set from
+  `Host.Forwards` by `setForwards`, but only when that list isn't nil, so a
+  caller that doesn't model forwards leaves them alone. If the block already
+  has the same forwards in the same order, nothing is touched (inline comments
+  stay). Otherwise the forward lines that parse are removed and the new list
+  goes where the first of them was. Forward lines that don't parse (unix
+  sockets, SOCKS `RemoteForward`, typos) are never touched. `Add` writes the
+  list after the modeled directives, so a clone copies the forwards.
 
 `setDirective` treats the modeled keys as single-valued (sshc owns them): it
 replaces the first occurrence in place (keeping the original key casing and any

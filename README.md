@@ -240,11 +240,12 @@ details pane and keeps them when you edit or clone the host.
 ### Port forwards
 
 `LocalForward` and `RemoteForward` lines in a host block are listed in the
-details pane as their `-L` / `-R` flags. sshc doesn't edit them: they stay
-as you wrote them, and the form keeps them when it saves the host. On the
-desktop `ssh` starts them itself; the Android app, which connects in-process,
-starts the TCP ones on connect. Unix socket forwards and `DynamicForward` show
-greyed out, since the app can't start them.
+details pane as their `-L` / `-R` flags. The desktop form keeps them when it
+saves the host, and a clone copies them. On the desktop `ssh` starts them
+itself; the Android app, which connects in-process, starts the TCP ones on
+connect and can edit them in its host form. sshc rewrites forward lines only
+when the list actually changed, and never touches unix socket forwards or
+`DynamicForward`, which show greyed out since the app can't start them.
 
 ### Template variables
 

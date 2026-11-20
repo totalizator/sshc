@@ -104,7 +104,7 @@ func TestUpdateKeepsForwardDirectives(t *testing.T) {
 	hosts, _ := Load([]string{path})
 	h, _ := findHost(hosts, "box")
 	h.User = "ops"
-	h.Forwards = nil // sshc never writes forwards; the directives stay as written
+	h.Forwards = nil // nil: a caller that doesn't model forwards leaves them as written
 	if err := Update(path, "box", h); err != nil {
 		t.Fatal(err)
 	}
@@ -113,5 +113,99 @@ func TestUpdateKeepsForwardDirectives(t *testing.T) {
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("config lacks %q after Update:\n%s", want, raw)
 		}
+	}
+}
+
+func TestForwardFlagRoundTrip(t *testing.T) {
+	for _, flag := range []string{
+		"-L 8080:localhost:80",
+		"-L *:8080:db.internal:5432",
+		"-R 9000:localhost:9000",
+		"-R 0:localhost:22",
+		"-L [::1]:8080:[fd00::2]:80",
+	} {
+		f, err := ParseForwardFlag(flag)
+		if err != nil {
+			t.Fatalf("%s: %v", flag, err)
+		}
+		if f.String() != flag {
+			t.Errorf("round trip %q -> %q", flag, f.String())
+		}
+		key, value := f.Directive()
+		back, err := ParseForward(key == "RemoteForward", value)
+		if err != nil || back != f {
+			t.Errorf("%s: directive %s %q parses to %+v, %v", flag, key, value, back, err)
+		}
+	}
+	for _, bad := range []string{"", "8080:localhost:80", "-L 8080", "-L 8080:localhost", "-L 8080:host:0", "-D 1080", "-L 80 80:h:1"} {
+		if _, err := ParseForwardFlag(bad); err == nil {
+			t.Errorf("%q: want an error", bad)
+		}
+	}
+}
+
+func TestUpdateWritesForwardsWhereTheyWere(t *testing.T) {
+	orig := "Host box\n  HostName 10.0.0.9\n  LocalForward 8080 localhost:80 # web ui\n  LocalForward /tmp/a.sock /tmp/b.sock\n  ForwardAgent yes\n"
+	path := writeTemp(t, "config", orig)
+	hosts, _ := Load([]string{path})
+	h, _ := findHost(hosts, "box")
+
+	// Same list: the forward lines come out exactly as with nil (an edit
+	// reindents the block either way).
+	untouched := h
+	untouched.Forwards = nil
+	if err := Update(path, "box", untouched); err != nil {
+		t.Fatal(err)
+	}
+	want, _ := os.ReadFile(path)
+	if err := Update(path, "box", h); err != nil {
+		t.Fatal(err)
+	}
+	if raw, _ := os.ReadFile(path); string(raw) != string(want) || !strings.Contains(string(raw), "# web ui") {
+		t.Fatalf("unchanged forwards were rewritten:\n%s\nwant:\n%s", raw, want)
+	}
+
+	f1, _ := ParseForwardFlag("-L 8081:localhost:81")
+	f2, _ := ParseForwardFlag("-R 9000:localhost:9000")
+	h.Forwards = []Forward{f1, f2}
+	if err := Update(path, "box", h); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(path)
+	got := string(raw)
+	for _, want := range []string{"LocalForward 8081 localhost:81", "RemoteForward 9000 localhost:9000", "LocalForward /tmp/a.sock /tmp/b.sock", "ForwardAgent yes"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "8080") {
+		t.Errorf("the old forward is still there:\n%s", got)
+	}
+	// In the old forward's place: before the socket line.
+	if strings.Index(got, "8081") > strings.Index(got, "a.sock") {
+		t.Errorf("new forwards should replace the old one in place:\n%s", got)
+	}
+
+	// An empty list removes the TCP forwards and keeps the socket one.
+	h.Forwards = []Forward{}
+	if err := Update(path, "box", h); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ = os.ReadFile(path)
+	if got := string(raw); strings.Contains(got, "8081") || strings.Contains(got, "9000") || !strings.Contains(got, "a.sock") {
+		t.Errorf("after removing forwards:\n%s", got)
+	}
+}
+
+func TestAddWritesForwards(t *testing.T) {
+	path := writeTemp(t, "config", "")
+	f, _ := ParseForwardFlag("-L 5432:db.internal:5432")
+	if err := Add(path, Host{Alias: "db", HostName: "10.0.0.5", Forwards: []Forward{f}}); err != nil {
+		t.Fatal(err)
+	}
+	hosts, _ := Load([]string{path})
+	h, ok := findHost(hosts, "db")
+	if !ok || len(h.Forwards) != 1 || h.Forwards[0] != f {
+		t.Fatalf("forwards after Add: %+v", h.Forwards)
 	}
 }
