@@ -303,3 +303,70 @@ func TestUpdatePreservesUntouchedFormatting(t *testing.T) {
 		t.Error("comment on untouched block was lost")
 	}
 }
+
+const labelled = `# file header
+Host a
+  HostName 10.0.0.1
+  # ForwardAgent yes
+
+# --- prod ---
+# the web box
+Host b
+  HostName 10.0.0.2
+
+Host c
+  HostName 10.0.0.3
+`
+
+func TestDeleteKeepsTheNextHostsLabel(t *testing.T) {
+	path := writeTemp(t, "config", labelled)
+	if err := Delete(path, "a"); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(path)
+	want := "# file header\n# --- prod ---\n# the web box\nHost b\n  HostName 10.0.0.2\n\nHost c\n  HostName 10.0.0.3\n"
+	if string(raw) != want {
+		t.Fatalf("after Delete a:\n%s\nwant:\n%s", raw, want)
+	}
+}
+
+func TestDeleteTakesItsOwnLabel(t *testing.T) {
+	path := writeTemp(t, "config", labelled)
+	if err := Delete(path, "b"); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(path)
+	if strings.Contains(string(raw), "prod") || strings.Contains(string(raw), "web box") {
+		t.Fatalf("b's label survived its deletion:\n%s", raw)
+	}
+	// a's indented trailing comment is a's content, not a label.
+	if !strings.Contains(string(raw), "  # ForwardAgent yes\n") {
+		t.Fatalf("a's own comment was lost:\n%s", raw)
+	}
+}
+
+func TestUpdateKeepsLabelAttached(t *testing.T) {
+	path := writeTemp(t, "config", labelled)
+	hosts, _ := Load([]string{path})
+	h, _ := findHost(hosts, "b")
+	h.User = "ops"
+	if err := Update(path, "b", h); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(path)
+	if !strings.Contains(string(raw), "# the web box\nHost b\n    HostName 10.0.0.2\n    User ops\n") {
+		t.Fatalf("label detached from b or b not rewritten:\n%s", raw)
+	}
+}
+
+func TestUntouchedLabelledFileIsByteIdentical(t *testing.T) {
+	path := writeTemp(t, "config", labelled)
+	if err := SetFav(path, "c", true); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(path)
+	want := strings.Replace(labelled, "Host c\n", "Host c #sshc fav=1\n", 1)
+	if string(raw) != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", raw, want)
+	}
+}

@@ -6,8 +6,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Five backups instead of one, and connecting no longer replaces them.**
+  Each write that changes the config moves the previous backup to
+  `.sshc.bak.1` … `.sshc.bak.4`. Stamping `used=` on connect and toggling a
+  favourite make no backup, so the last real edit stays recoverable; before,
+  a single connect after a mistaken delete overwrote the only copy with the
+  host. `ssh.Backups` / `ssh.Restore` / `ssh.Replace` are exported for the
+  Android app's restore.
+- **Writes are atomic.** The config is written to a temporary file and
+  renamed over the original.
+
+### Fixed
+
+- **Editing a host no longer clears its favourite and last-used.** The form
+  doesn't show them, and saving wrote the Host line from the form alone, so
+  an edit dropped `fav=1` and `used=`. They're now carried through, as are
+  the after-login steps (which a clone keeps too).
+- **Deleting a host no longer deletes the next host's label.** A comment
+  directly above a `Host` line was parsed into the block above it, so it went
+  with that block on delete, and editing the labelled host put a blank line
+  between them. Such comments now stay with the host they label.
+
 ### Added
 
+- **After-login steps (`run=`).** Repeated `run=` tokens hold commands the
+  Android app types into the login shell after connecting (`run=-…` is
+  switched off). Parsed into `Host.Run`, listed in the details pane, kept on
+  edit and clone, removed by `sshc clean`.
 - **Port forwards from the config.** `LocalForward` / `RemoteForward`
   directives are parsed into `Host.Forwards` (`ssh.ParseForward`,
   `Forward.ListenAddr` / `TargetAddr` with OpenSSH's bind defaults) and listed

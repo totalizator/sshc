@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/totalizator/sshc/ssh"
@@ -98,5 +100,43 @@ func TestStartupRoundTripsThroughForm(t *testing.T) {
 	}
 	if out := f.toHost("config"); out.Start != in.Start {
 		t.Fatalf("toHost start = %+v, want %+v", out.Start, in.Start)
+	}
+}
+
+// Editing a host on the desktop must keep what the form doesn't show: the
+// favourite, last-used and the app's after-login commands.
+func TestEditKeepsMetadataTheFormDoesntShow(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/config"
+	if err := os.WriteFile(path, []byte("Host web #sshc fav=1 used=1717000000\n  HostName 10.0.0.7\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	hosts, _ := ssh.Load([]string{path})
+	f := formFromHost(hosts[0], "edit", "web", true)
+	f.values["user"] = "ops"
+	if err := ssh.Update(path, "web", f.toHost(path)); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(path)
+	for _, want := range []string{"fav=1", "used=1717000000", "User ops"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("after edit, config lacks %q:\n%s", want, raw)
+		}
+	}
+
+	// A clone starts unpinned and unused.
+	c := formFromHost(hosts[0], "clone", "web-2", false).toHost(path)
+	if c.Fav || !c.LastUsed.IsZero() {
+		t.Errorf("clone kept fav/used: %+v", c)
+	}
+}
+
+func TestRunStepsSurviveEditAndClone(t *testing.T) {
+	in := ssh.Host{Alias: "web", HostName: "10.0.0.7", Run: []ssh.RunStep{{Cmd: "cd /srv"}, {Cmd: "htop", Off: true}}}
+	if out := formFromHost(in, "edit", "web", true).toHost("config"); len(out.Run) != 2 || !out.Run[1].Off {
+		t.Fatalf("edit Run = %+v", out.Run)
+	}
+	if out := formFromHost(in, "clone", "web-2", false).toHost("config"); len(out.Run) != 2 {
+		t.Fatalf("clone Run = %+v", out.Run)
 	}
 }
