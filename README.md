@@ -103,10 +103,14 @@ Flags:
 ```
 sshc clean [--dry-run]   Remove sshc's "#sshc …" metadata comments from the
                          writable config, returning it to plain-ssh form.
-                         Favourites/tags/env/last-used are discarded; directives,
+                         Favourites/tags/env/last-used/startup/after-login steps
+                         are discarded; directives,
                          other comments, and indentation are left untouched, and
                          the original is backed up first (see Write safety).
                          --dry-run reports the count without writing.
+sshc restore [N]         List the writable config's backups, newest first, or
+                         put backup N back (the current config is backed up
+                         first, so "sshc restore 1" undoes it).
 ```
 
 ### Keys
