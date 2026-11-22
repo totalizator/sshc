@@ -15,34 +15,31 @@ var cleanCmd = &cobra.Command{
 	Short: "Remove sshc metadata comments, returning the config to plain-ssh form",
 	Long: `Strip the "#sshc env=… tags=… fav=1 used=…" metadata comments that sshc
 writes on Host lines, returning the config to plain-ssh form. Favourites, tags,
-env labels, and last-used timestamps are discarded; directives, other comments,
-indentation, and ordering are left untouched. The original is backed up to
-<config>.sshc.bak before writing.
+env labels, last-used timestamps, startups and after-login steps are discarded;
+directives, other comments, indentation, and ordering are left untouched. The
+original is backed up to <config>.sshc.bak before writing ("sshc restore"
+puts it back).
 
 Operates on the writable config only (the first --config path, or
 ~/.ssh/config by default).`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		paths := configPaths
-		if len(paths) == 0 {
-			paths = defaultConfigPaths()
+		path, err := writableConfig()
+		if err != nil {
+			return err
 		}
-		if len(paths) == 0 {
-			return fmt.Errorf("no config path resolved")
-		}
-		path := paths[0]
 
 		if cleanDryRun {
 			hosts, err := ssh.Load([]string{path})
 			if err != nil {
 				return err
 			}
-			// Mirror StripMeta's predicate exactly so preview == apply: a host
-			// carries sshc metadata iff at least one recognised field parsed.
+			// HasMeta is StripMeta's own predicate, so preview == apply
+			// (startup and after-login steps count too).
 			n := 0
 			for _, h := range hosts {
-				if len(h.Tags) > 0 || h.Env != "" || h.Fav || !h.LastUsed.IsZero() {
+				if h.HasMeta() {
 					n++
 				}
 			}
@@ -58,7 +55,7 @@ Operates on the writable config only (the first --config path, or
 			fmt.Printf("no sshc metadata to strip in %s\n", path)
 			return nil
 		}
-		fmt.Printf("stripped sshc metadata from %d host(s) in %s (backup: %s.sshc.bak)\n", n, path, path)
+		fmt.Printf("stripped sshc metadata from %d host(s) in %s (undo: sshc restore 1)\n", n, path)
 		return nil
 	},
 }

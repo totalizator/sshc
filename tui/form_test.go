@@ -140,3 +140,17 @@ func TestRunStepsSurviveEditAndClone(t *testing.T) {
 		t.Fatalf("clone Run = %+v", out.Run)
 	}
 }
+
+func TestForwardsSurviveEditAndClone(t *testing.T) {
+	f, err := ssh.ParseForwardFlag("-L 8080:localhost:80")
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := ssh.Host{Alias: "web", HostName: "10.0.0.7", Forwards: []ssh.Forward{f}}
+	if out := formFromHost(in, "edit", "web", true).toHost("config"); len(out.Forwards) != 1 {
+		t.Fatalf("edit Forwards = %+v", out.Forwards)
+	}
+	if out := formFromHost(in, "clone", "web-2", false).toHost("config"); len(out.Forwards) != 1 {
+		t.Fatalf("clone Forwards = %+v", out.Forwards)
+	}
+}

@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Port forwards can be written.** `Add` and `Update` write `Host.Forwards`
+  as `LocalForward` / `RemoteForward` lines when the list isn't nil, rewriting
+  them only when it changed; socket forwards and `DynamicForward` are kept as
+  written. `ssh.ParseForwardFlag` reads the `-L` / `-R` flag form and
+  `Forward.Directive` gives the config line. The Android app edits forwards in
+  its host form with this, and a clone in the TUI now copies them.
+- **`sshc restore`** lists the config's backups (age, host count) and
+  `sshc restore N` puts one back. The current config is backed up first, so
+  `sshc restore 1` undoes a restore.
+
 ### Changed
 
 - **Five backups instead of one, and connecting no longer replaces them.**
@@ -20,6 +32,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`sshc clean --dry-run` counts hosts with only a startup or after-login
+  steps**, as `clean` itself strips them (`Host.HasMeta`).
 - **Editing a host no longer clears its favourite and last-used.** The form
   doesn't show them, and saving wrote the Host line from the form alone, so
   an edit dropped `fav=1` and `used=`. They're now carried through, as are

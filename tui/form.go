@@ -49,11 +49,13 @@ type formModel struct {
 	editAlias        string // non-empty only when editing in place
 	origProxyCommand string // preserved when the form leaves ProxyJump empty
 	// Metadata the form doesn't show, carried through so saving keeps it:
-	// fav and last-used only when editing, the after-login steps also on a clone.
-	origFav  bool
-	origUsed time.Time
-	origRun  []ssh.RunStep
-	err      string
+	// fav and last-used only when editing; the after-login steps and port
+	// forwards also on a clone.
+	origFav      bool
+	origUsed     time.Time
+	origRun      []ssh.RunStep
+	origForwards []ssh.Forward
+	err          string
 }
 
 // newFormModel seeds a blank "new connection" form.
@@ -73,6 +75,7 @@ func formFromHost(h ssh.Host, title, alias string, editing bool) formModel {
 		title:            title,
 		origProxyCommand: h.ProxyCommand,
 		origRun:          h.Run,
+		origForwards:     h.Forwards,
 		values: map[string]string{
 			"alias":    alias,
 			"host":     h.HostName,
@@ -201,6 +204,7 @@ func (f formModel) toHost(source string) ssh.Host {
 		Fav:          f.origFav,
 		LastUsed:     f.origUsed,
 		Run:          f.origRun,
+		Forwards:     f.origForwards,
 		Source:       source,
 		Editable:     true,
 	}

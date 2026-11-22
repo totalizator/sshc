@@ -35,6 +35,10 @@ func (m meta) recognised() bool {
 	return len(m.tags) > 0 || m.env != "" || m.fav || !m.lastUsed.IsZero() || !m.start.IsZero() || len(m.run) > 0
 }
 
+// HasMeta reports whether h carries any sshc metadata that StripMeta (sshc
+// clean) would remove.
+func (h Host) HasMeta() bool { return metaOf(h, meta{}).recognised() }
+
 // metaOf takes h's metadata, keeping the unknown tokens of prev.
 func metaOf(h Host, prev meta) meta {
 	return meta{tags: h.Tags, env: h.Env, fav: h.Fav, lastUsed: h.LastUsed, start: h.Start, run: h.Run, extra: prev.extra}

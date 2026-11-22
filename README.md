@@ -103,10 +103,14 @@ Flags:
 ```
 sshc clean [--dry-run]   Remove sshc's "#sshc …" metadata comments from the
                          writable config, returning it to plain-ssh form.
-                         Favourites/tags/env/last-used are discarded; directives,
+                         Favourites/tags/env/last-used/startup/after-login steps
+                         are discarded; directives,
                          other comments, and indentation are left untouched, and
                          the original is backed up first (see Write safety).
                          --dry-run reports the count without writing.
+sshc restore [N]         List the writable config's backups, newest first, or
+                         put backup N back (the current config is backed up
+                         first, so "sshc restore 1" undoes it).
 ```
 
 ### Keys
@@ -236,11 +240,12 @@ details pane and keeps them when you edit or clone the host.
 ### Port forwards
 
 `LocalForward` and `RemoteForward` lines in a host block are listed in the
-details pane as their `-L` / `-R` flags. sshc doesn't edit them: they stay
-as you wrote them, and the form keeps them when it saves the host. On the
-desktop `ssh` starts them itself; the Android app, which connects in-process,
-starts the TCP ones on connect. Unix socket forwards and `DynamicForward` show
-greyed out, since the app can't start them.
+details pane as their `-L` / `-R` flags. The desktop form keeps them when it
+saves the host, and a clone copies them. On the desktop `ssh` starts them
+itself; the Android app, which connects in-process, starts the TCP ones on
+connect and can edit them in its host form. sshc rewrites forward lines only
+when the list actually changed, and never touches unix socket forwards or
+`DynamicForward`, which show greyed out since the app can't start them.
 
 ### Template variables
 
@@ -270,8 +275,16 @@ When you add, edit, or delete a host, sshc:
 
 Stamping last-used on connect and toggling a favourite change only the
 `#sshc` comment and make no backup, so connecting a few times doesn't push
-your last real edit out of the backups. To go back, copy a backup over the
-config (the Android app has *Restore previous config* for this).
+your last real edit out of the backups. To go back:
+
+```sh
+sshc restore        # list the backups, newest first
+sshc restore 2      # put backup 2 back
+```
+
+A restore first saves the current config as the newest backup, so
+`sshc restore 1` right after undoes it. (The Android app has the same as
+*Restore previous config*.)
 
 Comment lines directly above a `Host` line (with no blank line between) are
 that host's label: they stay with it when you edit it and go with it when you

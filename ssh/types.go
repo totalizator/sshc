@@ -16,7 +16,9 @@ type Host struct {
 	ProxyCommand string
 
 	// Port forwards from LocalForward / RemoteForward directives (forward.go).
-	// Read-only: sshc keeps the directives as written and never writes these.
+	// Add and Update write them back (forward.go setForwards): nil leaves the
+	// block's forward lines as they are, a non-nil list (even empty) replaces
+	// the ones that parse, rewriting them only if the list changed.
 	Forwards []Forward
 	// OtherForwards holds forward directives Forwards can't represent (unix
 	// sockets, DynamicForward, malformed ones) as text, e.g. "DynamicForward 1080".
